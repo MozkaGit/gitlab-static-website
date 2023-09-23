@@ -83,8 +83,8 @@ jobs:
 
       - name: Tag and push Docker image
         run: |
-          docker tag static-website mozkadocker/gitlab-static-website:${{ github.ref }}
-          docker push mozkadocker/gitlab-static-website:${{ github.ref }}
+          docker tag static-website mozkadocker/gitlab-static-website
+          docker push mozkadocker/gitlab-static-website
 
   review:
     name: Review
