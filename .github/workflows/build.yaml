@@ -1,0 +1,196 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - closed
+
+jobs:
+  build_image:
+    name: Build image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.0
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.0.0
+
+      - name: Build Docker image
+        run: |
+          docker build -t static-website .
+          docker save static-website > static-website.tar
+      
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v3.1.3
+        with:
+          name: static-website.tar
+          path: static-website.tar
+
+  acceptance_test:
+    name: Acceptance test
+    needs: build_image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.0
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v2.1.1
+        with:
+          name: static-website.tar
+
+      - name: Load Docker image
+        run: docker load < static-website.tar
+
+      - name: Run Docker container
+        run: docker run -d -p 80:80 static-website
+
+      - name: Wait for container to be ready
+        run: sleep 5
+
+      - name: Test the container
+        run: |
+          curl "http://localhost" | grep "Dimension"
+          if [ $? -eq 0 ]; then echo "Acceptance test succeed"; fi
+
+  release:
+    name: Release
+    needs: acceptance_test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.0
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v2.1.1
+        with:
+          name: static-website.tar
+
+      - name: Load Docker image
+        run: docker load < static-website.tar
+
+      - name: Log in to Docker registry
+        run: docker login registry.gitlab.com -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Tag and push Docker image
+        run: |
+          docker tag static-website $REGISTRY:${{ github.ref }}
+          docker push $REGISTRY:${{ github.ref }}
+
+  review:
+    name: Review
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.0
+
+      - name: Set up AWS CLI
+        run: |
+          pip install awscli
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set region us-east-1
+
+      - name: Deploy to AWS Elastic Beanstalk for review
+        run: |
+          eb init --region us-east-1 --platform Docker static-website_${{ github.run_id }}
+          eb create review-env || echo "already exists."
+          eb status
+
+    if: github.event.pull_request
+
+  stop_review:
+    name: Stop review
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.0
+      
+      - name: Set up AWS CLI
+        run: |
+          pip install awscli
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set region us-east-1
+
+      - name: Cleanup AWS Elastic Beanstalk review environment
+        run: |
+          aws elasticbeanstalk terminate-environment --environment-name review-env
+          aws elasticbeanstalk delete-application --application-name static-website_${{ github.run_id }}
+
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+
+  staging:
+    name: Staging
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.0
+
+      - name: Set up AWS CLI
+        run: |
+          pip install awscli
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set region us-east-1
+
+      - name: Deploy to AWS Elastic Beanstalk for staging
+        run: |
+          eb init --region us-east-1 --platform Docker static-website_${{ github.run_id }}
+          eb create staging-env || echo "already exists."
+          eb status
+
+  test_staging:
+    name: Test staging
+    needs: staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.0
+
+      - name: Test the staging environment
+        run: |
+          curl $(cat staging-url.txt) | grep "Dimension"
+          if [ $? -eq 0 ]; then echo "Staging test succeed"; fi
+
+  production:
+    name: Production
+    needs: test_staging
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.0
+
+      - name: Set up AWS CLI
+        run: |
+          pip install awscli
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set region us-east-1
+
+      - name: Deploy to AWS Elastic Beanstalk for production
+        run: |
+          eb init --region us-east-1 --platform Docker static-website_${{ github.run_id }}
+          eb create production-env || echo "already exists."
+          eb status
+
+  test_production:
+    name: Test production
+    needs: production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.0
+
+      - name: Test the production environment
+        run: |
+          curl $(cat production-url.txt) | grep "Dimension"
+          if [ $? -eq 0 ]; then echo "Production test succeed"; fi
