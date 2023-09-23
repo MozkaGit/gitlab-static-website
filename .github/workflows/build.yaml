@@ -94,12 +94,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4.1.0
 
-      - name: Set up AWS CLI
+      - name: Set up AWS CLI and EB CLI
         run: |
           pip install awscli
           aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws configure set region us-east-1
+          git clone https://github.com/aws/aws-elastic-beanstalk-cli-setup.git
+          python ./aws-elastic-beanstalk-cli-setup/scripts/ebcli_installer.py
 
       - name: Deploy to AWS Elastic Beanstalk for review
         run: |
