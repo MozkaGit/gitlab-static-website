@@ -41,7 +41,7 @@ jobs:
         uses: actions/checkout@v4.1.0
 
       - name: Download Docker image artifact
-        uses: actions/download-artifact@v2.1.1
+        uses: actions/download-artifact@v3
         with:
           name: static-website.tar
 
@@ -211,6 +211,8 @@ jobs:
           eb init --region us-east-1 --platform Docker static-website_${{ github.run_id }}
           eb create production-env || echo "already exists."
           eb status
+          echo $(eb status staging-env | grep CNAME: | awk '{print $2}') > production-url.txt
+          export PRODUCTION_URL=$(eb status staging-test-env | grep CNAME: | awk '{print $2}')
 
       - name: Upload production URL as artifact
         uses: actions/upload-artifact@v3.1.3
