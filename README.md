@@ -26,7 +26,7 @@ This repository contains the necessary configuration and code to deploy a static
 - `.github/workflows/ci-cd.yaml`: This file contains the GitHub Actions workflow configuration for similar purposes as the GitLab CI/CD pipeline.
 
 1. Prerequisites
-- A GitLab or GitHub account and repository.
+- A GitLab or GitHub account.
 - Git installed on your local machine.
 - Setting Up your GitHub|GitLab Secrets
 
