@@ -1,4 +1,4 @@
-# GitLab Static Website<br>[![CI/CD Pipeline](https://github.com/MozkaGit/gitlab-static-website/actions/workflows/ci-cd.yaml/badge.svg)](https://github.com/MozkaGit/gitlab-static-website/actions/workflows/ci-cd.yaml)</br>
+# GitLab Static Website<br>[![CI/CD Pipeline](https://github.com/MozkaGit/gitlab-static-website/actions/workflows/ci-cd.yaml/badge.svg)](https://github.com/MozkaGit/gitlab-static-website/actions/workflows/ci-cd.yaml)
 
 This repository contains the necessary configuration and code to deploy a static website on AWS Elastic Beanstalk using CI/CD pipeline. This project originally came from [my GitLab](https://gitlab.com/MozkaGit/static-website) but I migrated it to GitHub and converted the `.gitlab.ci` to GitHub Actions.
 
